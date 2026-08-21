@@ -66,6 +66,7 @@ def load_sessions() -> list[dict]:
         return json.load(file)
 
 
+@st.cache_data(show_spinner="Running checkout recovery intelligence...")
 def run_pipeline(
     sessions: list[dict],
 ):

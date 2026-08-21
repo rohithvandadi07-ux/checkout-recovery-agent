@@ -22,6 +22,7 @@ import warnings
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
 
 import joblib
 import pandas as pd
@@ -299,7 +300,7 @@ def train_model(
     }
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=4)
 def load_model(
     model_path: Path = DEFAULT_MODEL_PATH,
 ) -> Pipeline:
