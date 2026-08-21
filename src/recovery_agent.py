@@ -16,6 +16,7 @@ from typing import Any
 
 from src.diagnoser import diagnose_session
 from src.policy_engine import evaluate_policy
+from src.audit_logger import log_session_decision
 
 
 def execute_action(
@@ -56,6 +57,7 @@ def execute_action(
 
 def process_session(
     session: dict[str, Any],
+    audit_path=None,
 ) -> dict[str, Any]:
     """
     Process one checkout session through the recovery pipeline.
@@ -68,44 +70,51 @@ def process_session(
         policy
           ↓
         simulated execution
+          ↓
+        audit log
     """
 
-    # Completed sessions should never enter recovery.
     if session.get("status") == "completed":
-        return {
-            "session_id": session["session_id"],
-            "diagnosis": None,
-            "policy": {
-                "decision": "no_action",
-                "action": None,
-                "reason": "Session was completed successfully.",
-            },
-            "execution": {
-                "execution_status": "not_executed",
-                "execution_message": (
-                    "Completed sessions are never touched."
-                ),
-            },
+        diagnosis = None
+
+        policy = {
+            "decision": "no_action",
+            "action": None,
+            "reason": "Session was completed successfully.",
         }
 
-    if session.get("status") != "abandoned":
-        raise ValueError(
-            f"Unsupported session status: {session.get('status')}"
+        execution = {
+            "execution_status": "not_executed",
+            "execution_message": (
+                "Completed sessions are never touched."
+            ),
+        }
+
+    else:
+        if session.get("status") != "abandoned":
+            raise ValueError(
+                f"Unsupported session status: "
+                f"{session.get('status')}"
+            )
+
+        diagnosis = diagnose_session(session)
+
+        policy = evaluate_policy(
+            session,
+            diagnosis,
         )
 
-    # Step 1: Diagnose the abandonment.
-    diagnosis = diagnose_session(session)
+        execution = execute_action(
+            session,
+            policy,
+        )
 
-    # Step 2: Apply the safety policy.
-    policy = evaluate_policy(
-        session,
-        diagnosis,
-    )
-
-    # Step 3: Execute only the action authorized by policy.
-    execution = execute_action(
-        session,
-        policy,
+    audit_record = log_session_decision(
+        session=session,
+        diagnosis=diagnosis,
+        policy=policy,
+        execution=execution,
+        audit_path=audit_path,
     )
 
     return {
@@ -113,16 +122,20 @@ def process_session(
         "diagnosis": diagnosis,
         "policy": policy,
         "execution": execution,
+        "audit": audit_record,
     }
-
 
 def process_sessions(
     sessions: list[dict[str, Any]],
+    audit_path=None,
 ) -> list[dict[str, Any]]:
     """Process multiple checkout sessions."""
 
     return [
-        process_session(session)
+        process_session(
+            session,
+            audit_path,
+        )
         for session in sessions
     ]
 
