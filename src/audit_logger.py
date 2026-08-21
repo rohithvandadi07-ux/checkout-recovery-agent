@@ -29,7 +29,11 @@ def create_audit_record(
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": session["session_id"],
-        "diagnosis": diagnosis["cause"] if diagnosis else None,
+        "diagnosis": (
+            diagnosis["cause"]
+            if diagnosis
+            else None
+        ),
         "confidence": (
             diagnosis["confidence"]
             if diagnosis
@@ -45,18 +49,29 @@ def create_audit_record(
 
 def write_audit_record(
     record: dict[str, Any],
-    audit_path: Path = DEFAULT_AUDIT_PATH,
+    audit_path: Path | None = None,
 ) -> None:
     """
     Append one audit record to the JSONL audit file.
+
+    If no audit path is provided, the default project audit
+    location is used.
     """
+
+    if audit_path is None:
+        audit_path = DEFAULT_AUDIT_PATH
+    else:
+        audit_path = Path(audit_path)
 
     audit_path.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    with audit_path.open("a", encoding="utf-8") as file:
+    with audit_path.open(
+        "a",
+        encoding="utf-8",
+    ) as file:
         file.write(
             json.dumps(
                 record,
@@ -71,10 +86,13 @@ def log_session_decision(
     diagnosis: dict[str, Any] | None,
     policy: dict[str, Any],
     execution: dict[str, Any],
-    audit_path: Path = DEFAULT_AUDIT_PATH,
+    audit_path: Path | None = None,
 ) -> dict[str, Any]:
     """
     Create and persist an audit record.
+
+    If no audit path is provided, the default project audit
+    location is used.
 
     Returns the record that was written.
     """
@@ -95,11 +113,19 @@ def log_session_decision(
 
 
 def read_audit_records(
-    audit_path: Path = DEFAULT_AUDIT_PATH,
+    audit_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     """
     Read all audit records from the JSONL file.
+
+    If no audit path is provided, the default project audit
+    location is used.
     """
+
+    if audit_path is None:
+        audit_path = DEFAULT_AUDIT_PATH
+    else:
+        audit_path = Path(audit_path)
 
     if not audit_path.exists():
         return []
@@ -116,6 +142,8 @@ def read_audit_records(
             if not line:
                 continue
 
-            records.append(json.loads(line))
+            records.append(
+                json.loads(line)
+            )
 
     return records
