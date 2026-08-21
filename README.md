@@ -1,440 +1,1115 @@
-# Checkout Drop-off Recovery Agent
+# Checkout Recovery Intelligence
 
-An AI-powered revenue recovery agent designed to identify abandoned checkout sessions, diagnose the likely reason for drop-off, determine whether a recovery action is safe, execute a bounded intervention, and maintain a complete audit trail.
+> AI-powered checkout abandonment diagnosis, safety-aware recovery decisions, and revenue impact simulation.
 
-> **Built for the Razorpay AI Buildathon — Track 03: AI Revenue Recovery**
+**DETECT → DIAGNOSE → DECIDE → RECOVER → MEASURE**
+
+Checkout Recovery Intelligence is an agentic revenue-recovery prototype designed to identify abandoned checkout sessions, determine the most likely abandonment cause, apply bounded recovery policies, simulate recovery actions, and measure the resulting revenue impact.
+
+The system combines an explainable rule-based diagnosis engine with a machine-learning model and a conservative policy layer that prevents unsafe automated interventions.
+
+> **Important:** This project currently operates in a synthetic/simulation environment. Recovery actions are simulated and do not trigger real payments, incentives, or customer communications.
 
 ---
 
-## Overview
+## 🚀 The Problem
 
-Checkout abandonment represents revenue at risk.
+Checkout abandonment represents potentially recoverable revenue.
 
-A customer may begin a payment and leave before completing it because of reasons such as:
+A simple system can detect that a customer abandoned checkout, but detection alone does not answer the important questions:
 
-* OTP timeout
-* Bank-page timeout
-* Network failure
-* Price shock
-* Distraction
-* Insufficient funds
-* Suspicious checkout behaviour
-* Unknown or ambiguous causes
+- Why did the customer abandon?
+- Should the system attempt recovery?
+- What recovery action is appropriate?
+- When should the system do nothing?
+- When should a case be escalated to a human?
+- How much revenue could actually be recovered?
+- Can automated recovery be prevented in suspicious cases?
 
-Instead of treating every abandoned checkout the same way, this project builds an agent that follows:
+Checkout Recovery Intelligence addresses these questions as one end-to-end decision system.
+
+---
+
+## 💡 The Solution
+
+The system processes checkout sessions through five stages:
 
 ```text
-Checkout Session
-       ↓
+DETECT
+   ↓
+DIAGNOSE
+   ↓
+DECIDE
+   ↓
+RECOVER
+   ↓
+MEASURE
+```
+
+### 1. Detect
+
+Identify abandoned checkout sessions and calculate the value currently at risk.
+
+Completed sessions are never treated as recovery opportunities.
+
+### 2. Diagnose
+
+Determine the most likely reason for abandonment.
+
+The system uses two independent diagnosis mechanisms:
+
+- Explainable rule-based diagnosis
+- Random Forest machine-learning diagnosis
+
+These are combined through a hybrid diagnosis layer.
+
+### 3. Decide
+
+The policy engine determines whether automated recovery is permitted.
+
+Safety gates include:
+
+- Minimum confidence requirement
+- Unknown-cause protection
+- Fraud protection
+- Insufficient-funds protection
+- High-value transaction protection
+
+### 4. Recover
+
+Approved recovery actions are simulated.
+
+Examples include:
+
+```text
+send_payment_retry_prompt
+send_checkout_resume_prompt
+send_cart_reminder
+manual_review
+```
+
+No real payment or customer communication is performed.
+
+### 5. Measure
+
+The revenue simulator estimates:
+
+- Eligible sessions
+- Eligible value
+- Successful recoveries
+- Recovered revenue
+- Recovery rate
+- Revenue recovery rate
+
+---
+
+# 🤖 Why This Is Agentic
+
+This is not simply a classification model.
+
+The system performs a complete decision loop:
+
+```text
+Checkout Event
+      ↓
 Risk Detection
-       ↓
+      ↓
 Cause Diagnosis
-       ↓
-Safety / Policy Check
-       ↓
-Recovery Action or Human Review
-       ↓
-Outcome
-       ↓
-Audit Log
-       ↓
-Dashboard
-```
-
-The project deliberately focuses on **one narrow problem — checkout drop-off recovery — rather than attempting to solve every possible payment degradation scenario.**
-
----
-
-## Problem Statement
-
-When a customer abandons checkout, the merchant potentially loses the entire transaction value.
-
-A recovery system should therefore answer four questions:
-
-1. **Is this checkout actually at risk?**
-2. **Why did the customer abandon it?**
-3. **Is an automated intervention appropriate and safe?**
-4. **Did the intervention recover the revenue?**
-
-The system is designed to answer these questions while maintaining strict limits on autonomous actions.
-
----
-
-## Core Idea
-
-The system separates **prediction** from **action**.
-
-The intelligence layer determines:
-
-```text
-Likely Cause + Confidence
-```
-
-The policy layer then determines:
-
-```text
-Should the system act?
-```
-
-This means the AI is not given unrestricted control over customer or financial actions.
-
-For example:
-
-```text
-Low confidence
       ↓
-Do not guess
+Evidence Evaluation
       ↓
-Manual review
+Policy Decision
+      ↓
+Action Selection
+      ↓
+Simulated Execution
+      ↓
+Audit Logging
+      ↓
+Revenue Measurement
 ```
 
-and:
+The diagnosis layer provides intelligence, while the policy layer determines what the system is actually allowed to do.
+
+This separation is intentional.
+
+The AI can recommend a cause, but it cannot bypass the safety policy.
+
+---
+
+# 🧠 Hybrid AI Diagnosis
+
+The diagnosis architecture combines two approaches.
 
 ```text
-Fraud suspected
-      ↓
-Never auto-action
-      ↓
-Human escalation
+                  Checkout Session
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+              ▼                     ▼
+       Rule-Based Engine       ML Classifier
+              │                     │
+              │                Random Forest
+              │                     │
+              └──────────┬──────────┘
+                         ▼
+                 Hybrid Diagnoser
+                         │
+                         ▼
+                Final Diagnosis
+                         │
+                         ▼
+                  Policy Engine
+```
+
+## Rule-Based Diagnosis
+
+The rule engine uses observable checkout features such as:
+
+- Payment method
+- Device
+- Checkout duration
+- Cart value
+
+It produces:
+
+```text
+cause
+confidence
+reasoning
+```
+
+The rule engine is deliberately explainable.
+
+---
+
+## Machine Learning Diagnosis
+
+The ML model uses a Random Forest classifier.
+
+### Input features
+
+```text
+cart_value
+payment_method
+device
+checkout_duration_minutes
+```
+
+### Target
+
+```text
+true_cause
+```
+
+`true_cause` is used only as the training target.
+
+It is **never provided as an input feature** during prediction.
+
+### Preprocessing
+
+Categorical features are one-hot encoded:
+
+```text
+payment_method
+device
+```
+
+Numeric features are passed directly:
+
+```text
+cart_value
+checkout_duration_minutes
+```
+
+### Model
+
+```text
+RandomForestClassifier
+n_estimators = 300
+class_weight = balanced
+random_state = 42
 ```
 
 ---
 
-## Key Design Principles
+# 🔀 Hybrid Decision Logic
 
-### 1. Explainability
+The hybrid layer compares the rule-based and ML diagnoses.
 
-Every diagnosis should have a reason that a human can understand.
+### Agreement
 
-### 2. Bounded Automation
-
-A session can receive at most one automated recovery attempt.
-
-### 3. Safety Gates
-
-Certain conditions override the AI's recommendation.
-
-Examples:
-
-* Fraud → human review
-* Low confidence → manual review
-* High-value discount → human approval
-* Insufficient funds → no automatic recovery action
-
-### 4. Failure Awareness
-
-The system should be able to say:
-
-> "I don't have enough evidence to determine the cause."
-
-Not every checkout problem can be reliably inferred from behavioural telemetry.
-
-### 5. Auditability
-
-Every session should produce an auditable decision record containing the diagnosis, confidence, reasoning, action, gate decision, and outcome.
-
-### 6. Business Impact
-
-The primary business metric is not only classification accuracy.
-
-We also measure:
+If both systems agree and both are sufficiently confident:
 
 ```text
-Revenue at Risk
+Rule diagnosis = ML diagnosis
+        ↓
+Hybrid agreement
+        ↓
+Final diagnosis
+```
+
+The final confidence uses the weaker of the two confidence values.
+
+This prevents a highly confident model from hiding a weak second signal.
+
+### Rule fallback
+
+If the rule engine is actionable but the ML model is not:
+
+```text
+Rule diagnosis retained
+```
+
+### ML fallback
+
+If the ML model is actionable but the rule engine is not:
+
+```text
+ML diagnosis retained
+```
+
+### Disagreement
+
+If both are actionable but disagree, the system selects the stronger supported confidence.
+
+### Insufficient evidence
+
+If neither system provides sufficient evidence:
+
+```text
+unknown
+```
+
+The hybrid diagnosis layer never authorizes a recovery action.
+
+That responsibility belongs to the policy engine.
+
+---
+
+# 🛡️ Safety-First Policy Engine
+
+The system is designed around bounded automation.
+
+The policy engine contains multiple safety gates.
+
+## Confidence Gate
+
+Low-confidence diagnoses cannot automatically trigger recovery.
+
+```text
+confidence < 0.50
+        ↓
+no_action
+```
+
+---
+
+## Unknown Cause Gate
+
+If the cause cannot be reliably identified:
+
+```text
+unknown
+   ↓
+no_action
+```
+
+---
+
+## Fraud Gate
+
+Fraud-suspected sessions are never automatically recovered.
+
+```text
+fraud_suspected
        ↓
-Revenue Recovered
-       ↓
-Recovery Rate
+manual_review
 ```
+
+No automated recovery or incentive is permitted.
 
 ---
 
-## System Architecture
+## Insufficient Funds Gate
+
+Insufficient-funds cases do not trigger automated recovery.
+
+---
+
+## High-Value Gate
+
+Transactions above the automatic recovery limit are escalated.
 
 ```text
-                  Synthetic Checkout Data
-                           │
-                           ▼
-                  ┌──────────────────┐
-                  │  Risk Detector   │
-                  └────────┬─────────┘
-                           │
-                    Abandoned?
-                           │
-                           ▼
-                  ┌──────────────────┐
-                  │    Diagnoser     │
-                  │                  │
-                  │ Cause + Confidence│
-                  └────────┬─────────┘
-                           │
-                           ▼
-                  ┌──────────────────┐
-                  │  Policy Engine   │
-                  │                  │
-                  │ Safety + Limits  │
-                  └────────┬─────────┘
-                           │
-                 ┌─────────┴─────────┐
-                 ▼                   ▼
-          Recovery Action       Human Review
-                 │                   │
-                 └─────────┬─────────┘
-                           ▼
-                  ┌──────────────────┐
-                  │ Outcome Simulator│
-                  └────────┬─────────┘
-                           ▼
-                  ┌──────────────────┐
-                  │   Audit Logger   │
-                  └────────┬─────────┘
-                           ▼
-                  ┌──────────────────┐
-                  │    Dashboard     │
-                  └──────────────────┘
+cart value > ₹10,000
+        ↓
+manual_review
 ```
 
 ---
 
-## Project Structure
+## Bounded Recovery
+
+Only explicitly approved recovery actions can be executed.
+
+The policy engine does not allow arbitrary actions.
+
+---
+
+# 💰 Business Impact
+
+The current synthetic evaluation contains:
+
+| Metric | Result |
+|---|---:|
+| Total sessions | 5,000 |
+| Abandoned sessions | 2,470 |
+| Completed sessions | 2,530 |
+| Value at risk | ₹10,754,115.34 |
+| Eligible sessions | 1,772 |
+| Eligible value | ₹6,187,205.63 |
+| Successful recoveries | 899 |
+| Recovered revenue | ₹2,824,402.06 |
+| Recovery rate | 50.73% |
+| Revenue recovery rate | 45.65% |
+
+These are **simulation results on synthetic checkout data**, not production Razorpay results.
+
+---
+
+# 📊 ML Evaluation
+
+The Random Forest diagnosis model was evaluated using a held-out test set.
+
+```text
+Training samples : 1,976
+Test samples     : 494
+```
+
+| Metric | Result |
+|---|---:|
+| Accuracy | 68.22% |
+| Macro Precision | 66.11% |
+| Macro Recall | 69.21% |
+| Macro F1 | 67.27% |
+
+The model is intentionally not treated as the sole decision-maker.
+
+Its predictions are combined with the explainable diagnosis engine before reaching the policy layer.
+
+---
+
+# 🔬 Hybrid Evaluation
+
+Across the evaluation:
+
+| Hybrid outcome | Sessions |
+|---|---:|
+| Hybrid Agreement | 1,234 |
+| Rule Fallback | 130 |
+| ML Fallback | 554 |
+| Rule Preferred | 193 |
+| ML Preferred | 51 |
+| Insufficient Evidence | 308 |
+
+This provides visibility into how the two diagnosis mechanisms interact rather than hiding the model's behavior behind a single prediction.
+
+---
+
+# 🛡️ Safety Evaluation
+
+Safety behavior is explicitly measured.
+
+| Safety metric | Result |
+|---|---:|
+| Fraud escalations | 112 |
+| High-value escalations | 100 |
+| Automated fraud recoveries | **0** |
+
+The key safety property is:
+
+```text
+Fraud detected
+     ↓
+Escalation
+     ↓
+No automated recovery
+```
+
+This demonstrates that revenue optimization is constrained by safety policy rather than allowed to operate without boundaries.
+
+---
+
+# 📈 Recovery Outcomes
+
+The evaluated policy produced:
+
+```text
+Recover       : 1,772
+No action     : 3,016
+Escalate      :   212
+```
+
+Simulated actions:
+
+```text
+1,984
+```
+
+Revenue simulation:
+
+```text
+Value at risk        : ₹10,754,115.34
+Eligible value       : ₹6,187,205.63
+Recovered revenue    : ₹2,824,402.06
+Recovery rate        : 50.73%
+Revenue recovery     : 45.65%
+```
+
+---
+
+# 📊 Dashboard
+
+The project includes a Streamlit dashboard providing visibility into the complete recovery pipeline.
+
+The dashboard displays:
+
+- Checkout sessions
+- Value at risk
+- Recovered revenue
+- Recovery rate
+- Eligible sessions
+- Successful recoveries
+- Abandonment causes
+- Agent decisions
+- Payment-method behavior
+- Device behavior
+- Recovery performance by cause
+- Individual session explorer
+- Decision audit trail
+
+The dashboard is intended to make the agent's decisions inspectable rather than presenting only a final revenue number.
+
+---
+
+# 🔎 Session-Level Explainability
+
+Each processed session can expose information such as:
+
+```text
+session_id
+status
+cart_value
+payment_method
+device
+cause
+confidence
+decision
+action
+eligible
+recovered
+recovered_revenue
+```
+
+The diagnosis also records:
+
+```text
+diagnosis_source
+rule_cause
+rule_confidence
+ml_cause
+ml_confidence
+agreement
+ml_probabilities
+```
+
+This allows the reasoning behind an automated decision to be inspected.
+
+---
+
+# 🧾 Decision Audit Trail
+
+Every processed session can be recorded in the audit trail.
+
+The audit contains information including:
+
+```text
+timestamp
+session_id
+diagnosis
+confidence
+policy_decision
+action
+execution_status
+reason
+execution_message
+```
+
+Completed sessions are explicitly recorded as untouched.
+
+Example:
+
+```text
+policy_decision : no_action
+execution_status: not_executed
+reason          : Session was completed successfully.
+```
+
+This creates an auditable record of system behavior.
+
+---
+
+# 🏗️ System Architecture
+
+```text
+                         ┌────────────────────┐
+                         │ Checkout Sessions  │
+                         └──────────┬─────────┘
+                                    │
+                                    ▼
+                         ┌────────────────────┐
+                         │  Risk Detection    │
+                         └──────────┬─────────┘
+                                    │
+                                    ▼
+                    ┌─────────────────────────────┐
+                    │     Hybrid Diagnosis        │
+                    │                             │
+                    │ ┌─────────┐   ┌──────────┐ │
+                    │ │ Rules   │ + │ Random   │ │
+                    │ │ Engine  │   │ Forest   │ │
+                    │ └─────────┘   └──────────┘ │
+                    └──────────────┬──────────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │   Policy Engine    │
+                         │                    │
+                         │ Confidence Gate    │
+                         │ Fraud Gate         │
+                         │ Value Gate         │
+                         │ Unknown Gate       │
+                         └──────────┬─────────┘
+                                    │
+                                    ▼
+                         ┌────────────────────┐
+                         │ Recovery Agent     │
+                         │                    │
+                         │ Simulated Action   │
+                         └──────────┬─────────┘
+                                    │
+                         ┌──────────┴─────────┐
+                         ▼                    ▼
+                ┌────────────────┐   ┌────────────────┐
+                │ Audit Logger   │   │ Revenue        │
+                │                │   │ Simulator      │
+                └────────────────┘   └───────┬────────┘
+                                             │
+                                             ▼
+                                    ┌────────────────┐
+                                    │ Dashboard      │
+                                    └────────────────┘
+```
+
+---
+
+# 📁 Project Structure
 
 ```text
 checkout-recovery-agent/
 │
 ├── data/
-│   ├── sessions.json
-│   ├── audit_log.json
-│   └── summary.json
+│   └── sessions.json
 │
 ├── dashboard/
-│   └── dashboard.html
+│   └── app.py
+│
+├── evaluation/
+│   └── system_evaluation.md
 │
 ├── models/
+│   └── checkout_diagnosis.joblib
+│
+├── scripts/
+│   └── evaluate_system.py
 │
 ├── src/
-│   ├── generate_data.py
+│   ├── __init__.py
+│   ├── audit_logger.py
 │   ├── detector.py
 │   ├── diagnoser.py
+│   ├── generate_data.py
+│   ├── hybrid_diagnoser.py
+│   ├── ml_diagnoser.py
 │   ├── policy_engine.py
 │   ├── recovery_agent.py
-│   ├── simulator.py
-│   └── audit_logger.py
+│   └── revenue_simulator.py
 │
 ├── tests/
-│   ├── test_detector.py
 │   ├── test_diagnoser.py
-│   ├── test_policy_engine.py
-│   └── test_agent.py
+│   ├── test_hybrid_diagnoser.py
+│   ├── test_ml_diagnoser.py
+│   └── ...
 │
-├── PROJECT.md
-├── README.md
 ├── requirements.txt
-└── .gitignore
+└── README.md
 ```
 
 ---
 
-## Abandonment Causes
+# ⚙️ Installation
 
-The initial system models the following causes:
+Clone the repository:
 
-| Cause                | Description                                                 |
-| -------------------- | ----------------------------------------------------------- |
-| `otp_timeout`        | OTP delivery or entry takes too long                        |
-| `price_shock`        | Customer abandons after seeing the effective price          |
-| `network_drop`       | Network/connectivity interruption                           |
-| `bank_page_timeout`  | Banking page takes too long to complete                     |
-| `insufficient_funds` | Customer cannot complete the payment financially            |
-| `distraction_exit`   | Customer leaves after spending significant time in checkout |
-| `fraud_suspected`    | Checkout behaviour triggers a fraud concern                 |
-| `unknown`            | Insufficient evidence for a reliable diagnosis              |
+```bash
+git clone https://github.com/rohithvandadi07-ux/checkout-recovery-agent.git
+cd checkout-recovery-agent
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv .venv
+```
+
+Activate it:
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
-## Safety Policy
+# 🧪 Run Tests
 
-The recovery agent follows hard constraints.
+Run the complete test suite:
 
-```text
-Maximum automated attempts per session = 1
+```bash
+pytest -q
 ```
 
-### Fraud
+Current result:
 
 ```text
+76 passed
+```
+
+The tests cover diagnosis, ML prediction, hybrid diagnosis, policy behavior, recovery-agent behavior, and other core components.
+
+---
+
+# 🤖 Train the ML Model
+
+Run:
+
+```bash
+python -m src.ml_diagnoser
+```
+
+Example output:
+
+```text
+ML CHECKOUT DIAGNOSIS
+
+Training samples : 1976
+Test samples     : 494
+Accuracy         : 0.6822
+Macro Precision  : 0.6611
+Macro Recall     : 0.6921
+Macro F1         : 0.6727
+```
+
+The trained model is stored locally at:
+
+```text
+models/checkout_diagnosis.joblib
+```
+
+---
+
+# 🔬 Run System Evaluation
+
+Run:
+
+```bash
+python -m scripts.evaluate_system
+```
+
+This evaluates:
+
+- Dataset statistics
+- ML performance
+- Hybrid diagnosis behavior
+- Policy outcomes
+- Revenue impact
+- Safety behavior
+
+The detailed evaluation is documented in:
+
+```text
+evaluation/system_evaluation.md
+```
+
+---
+
+# 💻 Run the Dashboard
+
+Start Streamlit:
+
+```bash
+streamlit run dashboard/app.py
+```
+
+Then open the local Streamlit URL shown in the terminal.
+
+The dashboard provides an interactive view of the simulated recovery system.
+
+---
+
+# 🧪 Example Diagnosis
+
+Example abandoned session:
+
+```python
+session = {
+    "session_id": "cs_demo",
+    "cart_value": 2500.0,
+    "payment_method": "UPI",
+    "device": "mobile",
+    "checkout_duration_minutes": 0.8,
+    "status": "abandoned"
+}
+```
+
+The hybrid system can produce:
+
+```text
+cause:
+otp_timeout
+
+confidence:
+0.73
+
+diagnosis_source:
+hybrid_agreement
+```
+
+The rule and ML systems both identify the same likely cause.
+
+---
+
+# 🚨 Example Fraud Case
+
+Example:
+
+```python
+session = {
+    "session_id": "cs_fraud_demo",
+    "cart_value": 20000.0,
+    "payment_method": "card",
+    "device": "desktop",
+    "checkout_duration_minutes": 0.3,
+    "status": "abandoned"
+}
+```
+
+The system identifies:
+
+```text
+Diagnosis:
 fraud_suspected
-        ↓
-Human escalation
+
+Policy:
+escalate
+
+Action:
+manual_review
 ```
 
-### Insufficient Funds
+The recovery action is not automatically executed.
+
+This is a deliberate safety boundary.
+
+---
+
+# 🔐 Design Principles
+
+## Explainability
+
+The system should be able to explain why a session received a diagnosis.
+
+## Bounded Automation
+
+The AI does not have unrestricted control over recovery actions.
+
+## Conservative Decision-Making
+
+When evidence is insufficient, the system can choose:
 
 ```text
-insufficient_funds
-        ↓
-No automated recovery action
+no_action
 ```
 
-### Low Confidence
+instead of forcing a recovery decision.
+
+## Safety Before Revenue
+
+Fraud and high-value cases are escalated rather than automatically recovered.
+
+## Auditability
+
+Decisions and simulated executions are logged.
+
+## Separation of Concerns
+
+Diagnosis and policy are separate components.
 
 ```text
-confidence < threshold
-        ↓
+Diagnosis:
+"What is probably happening?"
+
+Policy:
+"What are we allowed to do?"
+```
+
+---
+
+# ⚠️ Current Limitations
+
+This is a prototype and not a production payment-recovery system.
+
+Current limitations include:
+
+1. The dataset is synthetic.
+2. The system is not connected to live Razorpay payment events.
+3. Recovery actions are simulated.
+4. No real customer communication is triggered.
+5. The ML model currently achieves 68.22% accuracy.
+6. The feature set is intentionally small.
+7. The system does not yet learn continuously from real production outcomes.
+8. Revenue recovery results are simulation estimates rather than real business results.
+
+These limitations are intentionally documented rather than hidden.
+
+---
+
+# 🚀 Future Roadmap
+
+## Phase 1 — Production Data
+
+Replace synthetic checkout sessions with anonymized real checkout telemetry.
+
+Potential signals:
+
+```text
+payment state transitions
+gateway response codes
+latency
+retry count
+checkout step
+session duration
+device/network context
+```
+
+## Phase 2 — Online Learning
+
+Use actual recovery outcomes as feedback.
+
+```text
+Prediction
+    ↓
+Recovery
+    ↓
+Outcome
+    ↓
+Feedback
+    ↓
+Model improvement
+```
+
+## Phase 3 — Experimentation
+
+Introduce controlled experiments to measure:
+
+- Incremental conversion
+- Recovery uplift
+- Customer response
+- False-positive recovery
+- Revenue per intervention
+
+## Phase 4 — Payment Platform Integration
+
+Connect the recovery intelligence layer to appropriate payment and checkout infrastructure.
+
+The policy engine would remain the safety boundary.
+
+## Phase 5 — Real-Time Agent
+
+Move from batch simulation toward event-driven processing:
+
+```text
+Checkout event
+      ↓
+Real-time detection
+      ↓
+Diagnosis
+      ↓
+Policy
+      ↓
+Bounded action
+      ↓
+Outcome
+```
+
+---
+
+# 🎯 Razorpay-Oriented Use Case
+
+A payment platform can observe millions of checkout attempts.
+
+Instead of treating every abandoned checkout identically, a recovery intelligence layer can distinguish between different situations.
+
+For example:
+
+```text
+OTP timeout
+    ↓
+Payment retry prompt
+
+Network interruption
+    ↓
+Checkout resume prompt
+
+Price shock
+    ↓
+Cart reminder
+
+Fraud suspicion
+    ↓
+Manual review
+
+Low confidence
+    ↓
+No action
+
+High-value transaction
+    ↓
 Manual review
 ```
 
-### High-Value Discount
+The key idea is:
+
+> **Do not recover every abandoned checkout. Recover the right ones, using evidence and bounded policies.**
+
+---
+
+# 📌 Key Takeaway
+
+Checkout Recovery Intelligence transforms checkout abandonment from a passive analytics problem into a decision-making problem.
+
+Instead of:
 
 ```text
-price_shock
-+
-cart value above allowed limit
+Customer abandoned checkout.
+```
+
+the system attempts to answer:
+
+```text
+Why did they abandon?
         ↓
-Human approval
+How confident are we?
+        ↓
+Is recovery safe?
+        ↓
+What action is allowed?
+        ↓
+Did the action recover revenue?
 ```
 
-The policy layer therefore acts as a safety boundary between AI recommendations and financial actions.
-
----
-
-## Data Generation
-
-The initial dataset will be synthetic.
-
-Each generated checkout session will contain observable information such as:
-
-* Session ID
-* Cart value
-* Payment method
-* Device
-* Checkout duration
-* Session status
-
-The generator will also maintain a hidden ground-truth abandonment cause.
-
-The recovery system will **not receive the hidden cause** during diagnosis.
-
-This allows diagnosis accuracy to be evaluated honestly after the recovery process.
-
-The synthetic data will contain correlations between checkout behaviour and abandonment causes rather than assigning causes completely at random.
-
----
-
-## Evaluation Metrics
-
-The system will measure:
-
-### Operational Metrics
-
-* Total checkout sessions
-* Completed sessions
-* Abandoned sessions
-* Total value at risk
-* Total value recovered
-
-### Recovery Metrics
-
-* Recovery rate by transaction value
-* Recovery rate by session count
-* Recovery action success rate
-* Revenue recovered per action
-
-### Intelligence Metrics
-
-* Overall diagnosis accuracy
-* Diagnosis accuracy by cause
-* Confidence distribution
-* Unknown / low-confidence rate
-
-### Safety Metrics
-
-* Number of human escalations
-* Number of blocked actions
-* Fraud cases prevented from automatic action
-* High-value actions blocked
-* Maximum-action violations
-
----
-
-## Technology
-
-Initial implementation:
-
-* Python
-* NumPy
-* Pandas
-* Scikit-learn
-* Pytest
-* HTML/CSS/JavaScript for the dashboard
-
-The first implementation will prioritize deterministic, explainable logic.
-
-Machine-learning-based diagnosis can then be introduced and evaluated against the baseline.
-
----
-
-## Development Strategy
-
-### Phase 1 — Data
-
-Build a realistic synthetic checkout-session generator.
-
-### Phase 2 — Detection
-
-Identify abandoned sessions and calculate revenue at risk.
-
-### Phase 3 — Diagnosis
-
-Build explainable cause prediction with confidence scores.
-
-### Phase 4 — Policy
-
-Implement safety gates, action limits, and human escalation.
-
-### Phase 5 — Recovery
-
-Simulate bounded recovery interventions and their outcomes.
-
-### Phase 6 — Audit
-
-Record every decision and outcome.
-
-### Phase 7 — Dashboard
-
-Build a visual recovery console showing business metrics and individual decisions.
-
-### Phase 8 — Intelligence Upgrade
-
-Evaluate ML-based diagnosis and introduce AI/LLM capabilities only where they provide measurable value.
-
-### Phase 9 — Testing & Hardening
-
-Test edge cases, safety boundaries, failure recovery, and reproducibility.
-
----
-
-## Current Status
-
-**Project initialized.**
-
-Implementation has not started yet.
-
-The next milestone is the synthetic checkout-session generator.
-
----
-
-## Project Philosophy
-
-The goal is not to build an agent that acts on everything.
-
-The goal is to build an agent that understands:
+This creates a closed-loop architecture:
 
 ```text
-When to act
-When not to act
-Why it acted
-Why it did not act
-What happened afterward
+DETECT
+  ↓
+DIAGNOSE
+  ↓
+DECIDE
+  ↓
+RECOVER
+  ↓
+MEASURE
+  ↺
 ```
 
-That distinction is central to building reliable AI systems for financial workflows.
+---
+
+# 📊 Current Prototype Results
+
+```text
+5,000 checkout sessions evaluated
+
+₹10.75M value at risk
+
+1,772 eligible recovery sessions
+
+899 successful simulated recoveries
+
+₹2.82M simulated recovered revenue
+
+50.73% recovery rate
+
+45.65% revenue recovery rate
+
+68.22% ML accuracy
+
+67.27% ML Macro F1
+
+1,234 hybrid diagnosis agreements
+
+112 fraud escalations
+
+100 high-value escalations
+
+0 automated fraud recoveries
+
+76 tests passing
+```
+
+> Results are based on the project's synthetic simulation environment and should not be interpreted as production performance.
+
+---
+
+# 🏁 Status
+
+**Prototype status: Functional end-to-end system**
+
+Implemented:
+
+- [x] Checkout data generation
+- [x] Checkout risk detection
+- [x] Explainable diagnosis
+- [x] Random Forest diagnosis
+- [x] Hybrid diagnosis
+- [x] Bounded policy engine
+- [x] Fraud escalation
+- [x] High-value escalation
+- [x] Simulated recovery execution
+- [x] Audit logging
+- [x] Revenue simulation
+- [x] Streamlit dashboard
+- [x] System evaluation
+- [x] Automated tests
+
+---
+
+## License
+
+This project is a prototype developed for demonstration and evaluation purposes.
