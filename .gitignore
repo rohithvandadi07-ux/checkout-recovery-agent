@@ -33,3 +33,6 @@ dist/
 
 # Audit logs
 audit/
+.pytest_cache/
+*.pyc
+models/*.joblib
