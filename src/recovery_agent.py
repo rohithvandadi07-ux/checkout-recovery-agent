@@ -1,22 +1,27 @@
 """
 Checkout Recovery Agent.
 
-This module orchestrates the existing:
-1. Risk detector
-2. Diagnosis engine
-3. Policy engine
+This module orchestrates:
+1. Session validation
+2. Hybrid diagnosis
+3. Bounded policy evaluation
+4. Simulated recovery execution
+5. Audit logging
 
-It executes only bounded, simulated recovery actions.
-No real payment or customer communication is performed.
+The hybrid diagnosis combines an explainable rule-based
+diagnoser with a machine-learning model.
+
+No real payment, refund, or customer communication
+is performed.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from src.diagnoser import diagnose_session
-from src.policy_engine import evaluate_policy
 from src.audit_logger import log_session_decision
+from src.hybrid_diagnoser import diagnose_hybrid
+from src.policy_engine import evaluate_policy
 
 
 def execute_action(
@@ -63,9 +68,12 @@ def process_session(
     Process one checkout session through the recovery pipeline.
 
     Pipeline:
+
         session
           ↓
-        diagnosis
+        validation
+          ↓
+        hybrid diagnosis
           ↓
         policy
           ↓
@@ -74,13 +82,17 @@ def process_session(
         audit log
     """
 
-    if session.get("status") == "completed":
+    status = session.get("status")
+
+    if status == "completed":
         diagnosis = None
 
         policy = {
             "decision": "no_action",
             "action": None,
-            "reason": "Session was completed successfully.",
+            "reason": (
+                "Session was completed successfully."
+            ),
         }
 
         execution = {
@@ -90,24 +102,41 @@ def process_session(
             ),
         }
 
-    else:
-        if session.get("status") != "abandoned":
-            raise ValueError(
-                f"Unsupported session status: "
-                f"{session.get('status')}"
-            )
+    elif status == "abandoned":
+        # -----------------------------------------------------------
+        # Hybrid diagnosis
+        # -----------------------------------------------------------
 
-        diagnosis = diagnose_session(session)
+        diagnosis = diagnose_hybrid(
+            session
+        )
+
+        # -----------------------------------------------------------
+        # Safety policy
+        # -----------------------------------------------------------
 
         policy = evaluate_policy(
             session,
             diagnosis,
         )
 
+        # -----------------------------------------------------------
+        # Bounded simulated execution
+        # -----------------------------------------------------------
+
         execution = execute_action(
             session,
             policy,
         )
+
+    else:
+        raise ValueError(
+            f"Unsupported session status: {status}"
+        )
+
+    # ---------------------------------------------------------------
+    # Audit every session decision
+    # ---------------------------------------------------------------
 
     audit_record = log_session_decision(
         session=session,
@@ -124,6 +153,7 @@ def process_session(
         "execution": execution,
         "audit": audit_record,
     }
+
 
 def process_sessions(
     sessions: list[dict[str, Any]],

@@ -18,6 +18,8 @@ rule-based diagnoser until the ML model is validated.
 from __future__ import annotations
 
 import json
+import warnings
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -119,10 +121,12 @@ def load_training_data(
             + ", ".join(missing_columns)
         )
 
+    # Only abandoned sessions are relevant for diagnosis.
     dataframe = dataframe[
         dataframe["status"] == "abandoned"
     ].copy()
 
+    # Remove incomplete training rows.
     dataframe = dataframe.dropna(
         subset=FEATURE_COLUMNS + [TARGET_COLUMN]
     )
@@ -267,11 +271,18 @@ def train_model(
         model_path,
     )
 
+    # If an older version of this model was cached,
+    # force future predictions to use the newly trained model.
+    load_model.cache_clear()
+
     return {
         "model_path": str(model_path),
         "training_samples": len(X_train),
         "test_samples": len(X_test),
-        "accuracy": round(accuracy, 4),
+        "accuracy": round(
+            accuracy,
+            4,
+        ),
         "macro_precision": round(
             precision,
             4,
@@ -288,10 +299,21 @@ def train_model(
     }
 
 
+@lru_cache(maxsize=8)
 def load_model(
     model_path: Path = DEFAULT_MODEL_PATH,
 ) -> Pipeline:
-    """Load a previously trained diagnosis model."""
+    """
+    Load a previously trained diagnosis model.
+
+    Models are cached in memory so repeated predictions do not
+    repeatedly deserialize the same joblib file.
+
+    This is important when processing thousands of checkout
+    sessions in one run.
+    """
+
+    model_path = Path(model_path)
 
     if not model_path.exists():
         raise FileNotFoundError(
@@ -299,9 +321,23 @@ def load_model(
             "Train the model first."
         )
 
-    model = joblib.load(
-        model_path
-    )
+    # NumPy 2.5 + older joblib versions can emit a known
+    # deprecation warning while restoring serialized arrays.
+    # The warning is limited strictly to this deserialization step.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=(
+                "Setting the shape on a NumPy array has "
+                "been deprecated"
+            ),
+            category=DeprecationWarning,
+            module=r"joblib\.numpy_pickle",
+        )
+
+        model = joblib.load(
+            model_path
+        )
 
     return model
 
@@ -339,7 +375,7 @@ def predict_session(
         )
 
     model = load_model(
-        model_path
+        Path(model_path)
     )
 
     dataframe = pd.DataFrame(
@@ -367,7 +403,10 @@ def predict_session(
             4,
         )
         for label, probability
-        in zip(classes, probabilities)
+        in zip(
+            classes,
+            probabilities,
+        )
     }
 
     confidence = max(
